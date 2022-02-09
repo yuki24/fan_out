@@ -29,7 +29,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "activejob",     ">= 6.0"
   spec.add_dependency "activesupport", ">= 6.0"
-  spec.add_dependency "railtie",       ">= 6.0"
+  spec.add_dependency "railties",      ">= 6.0"
 
   spec.add_development_dependency "activerecord", ">= 6.0"
   spec.add_development_dependency "pg"
