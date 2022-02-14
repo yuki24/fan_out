@@ -39,33 +39,37 @@ module FanOut
 
     def fan_out!(scopes: self.class.message_couriers.keys)
       self.class.message_couriers.slice(*scopes).each do |scope, message_courier|
-        association = association(FanOut.inbox_table_name(scope, self.class.name))
-        inbox_class = association.klass
-        receivables = message_courier.invoke_method_or_block(self, message_courier.delivery_method)
-        score       = message_courier.invoke_method_or_block(self, message_courier.scorer)
+        should_deliver = message_courier.invoke_method_or_block(self, message_courier.deliver_if)
 
-        attributes = [
-          association.reflection.foreign_key,
-          "#{scope.to_s.singularize.underscore}_id",
-          score.nil? ? nil : "score",
-        ].compact
+        if should_deliver
+          association = association(FanOut.inbox_table_name(scope, self.class.name))
+          inbox_class = association.klass
+          receivables = message_courier.invoke_method_or_block(self, message_courier.delivery_method)
+          score       = message_courier.invoke_method_or_block(self, message_courier.scorer)
 
-        if receivables.respond_to?(:to_sql)
-          target_model = scope.to_s.classify.constantize
+          attributes = [
+            association.reflection.foreign_key,
+            "#{scope.to_s.singularize.underscore}_id",
+            score.nil? ? nil : "score",
+          ].compact
 
-          attribute_values = [
-            self.class.connection.quote(id),                                        # deliverable_id,
-            "#{target_model.quoted_table_name}.#{target_model.quoted_primary_key}", # receivable_id,
-            score                                                                   # score
-          ].compact.join(", ")
+          if receivables.respond_to?(:to_sql)
+            target_model = scope.to_s.classify.constantize
 
-          self.class.execute_fan_out_inserts(receivables.select(attribute_values), inbox_class, attributes)
-        else
-          messages_to_deliver = receivables.map do |receivable|
-            attributes.zip([id, receivable.id, score]).to_h
+            attribute_values = [
+              self.class.connection.quote(id),                                        # deliverable_id,
+              "#{target_model.quoted_table_name}.#{target_model.quoted_primary_key}", # receivable_id,
+              score                                                                   # score
+            ].compact.join(", ")
+
+            self.class.execute_fan_out_inserts(receivables.select(attribute_values), inbox_class, attributes)
+          else
+            messages_to_deliver = receivables.map do |receivable|
+              attributes.zip([id, receivable.id, score]).to_h
+            end
+
+            inbox_class.insert_all(messages_to_deliver)
           end
-
-          inbox_class.insert_all(messages_to_deliver)
         end
       end
     end
