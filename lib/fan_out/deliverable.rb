@@ -8,8 +8,8 @@ module FanOut
     extend ActiveSupport::Concern
 
     included do
-      after_commit :__dispatch_message_distribution__, on: :create
-      after_commit :__dispatch_message_redistribution__, on: :update
+      after_commit :dispatch_message_distribution, on: :create
+      after_commit :dispatch_message_redistribution, on: :update
     end
 
     class_methods do
@@ -78,7 +78,7 @@ module FanOut
 
     private
 
-    def __dispatch_message_distribution__
+    def dispatch_message_distribution
       self.class.message_couriers.each do |scope, message_courier|
         if message_courier.invoke_method_or_block(self, message_courier.deliver_if)
           ::FanOut::MessageDistributionJob.perform_later(self, scopes: scope)
@@ -86,7 +86,7 @@ module FanOut
       end
     end
 
-    def __dispatch_message_redistribution__
+    def dispatch_message_redistribution
       self.class.message_couriers.each do |scope, message_courier|
         if message_courier.invoke_method_or_block(self, message_courier.withdraw_if)
           ::FanOut::MessageDeletionJob.perform_later(self, scopes: scope)
