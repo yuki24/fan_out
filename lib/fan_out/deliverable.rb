@@ -54,7 +54,7 @@ module FanOut
           target_model = scope.to_s.classify.constantize
 
           attribute_values = [
-            id,                                                                     # deliverable_id,
+            self.class.connection.quote(id),                                        # deliverable_id,
             "#{target_model.quoted_table_name}.#{target_model.quoted_primary_key}", # receivable_id,
             score                                                                   # score
           ].compact.join(", ")
