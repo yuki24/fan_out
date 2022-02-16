@@ -29,37 +29,17 @@ module FanOut::Receivable
 
     def +(other_inbox)
       if deliverable_class != other_inbox.klass
-        raise ArgumentError, "The deriverable class does not match: given #{other_inbox.klass.to_s}, expected #{deliverable_class.to_s}"
+        raise ArgumentError, "The deliverable class does not match: given #{other_inbox.klass.to_s}, expected #{deliverable_class.to_s}"
       end
 
       union = +"("
-      union << [self.inbox_records, other_inbox.inbox_records].map { |scope| "(#{scope.to_sql})" }.join(" UNION ALL ")
-      union << ") #{inbox_name}"
+      union << [other_inbox, __getobj__].map { |scope| "(#{scope.to_sql})" }.join(" UNION ALL ")
+      union << ") #{deliverable_class.table_name}"
 
-      join_on_expr = __getobj__.joins_values[0].right
-
-      right    = Arel::Attributes::Attribute.new(Arel::Table.new(inbox_name), join_on_expr.expr.right.name)
-      equality = Arel::Nodes::Equality.new(join_on_expr.expr.left, right)
-      on       = Arel::Nodes::On.new(equality)
-      join     = Arel::Nodes::LeadingJoin.new(Arel.sql(union), on)
-
-      deliverable_class.joins(join).order("#{inbox_name}.score" => :desc)
-    end
-
-    def inbox_records
-      deliverable_class
-        .unscoped
-        .select("*")
-        .from(association_proxy.reflection.options[:join_table].to_s)
-        .where(__getobj__.where_clause.ast)
-        .order("#{association_proxy.reflection.options[:join_table].to_s}.score" => :desc)
+      deliverable_class.from(union)
     end
 
     private
-
-    def inbox_name
-      "#{deliverable_name.to_s.singularize}_inbox"
-    end
 
     def deliverable_class
       __getobj__.klass
