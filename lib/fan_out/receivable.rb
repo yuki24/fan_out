@@ -1,5 +1,7 @@
 require 'active_support/concern'
 
+require_relative './union_scope'
+
 module FanOut::Receivable
   extend ActiveSupport::Concern
 
@@ -19,6 +21,8 @@ module FanOut::Receivable
   end
 
   class Inbox < SimpleDelegator
+    include FanOut::UnionScope
+
     attr_reader :deliverable_name, :association_proxy
 
     def initialize(obj, deliverable_name, association_proxy)
@@ -32,11 +36,7 @@ module FanOut::Receivable
         raise ArgumentError, "The deliverable class does not match: given #{other_inbox.klass.to_s}, expected #{deliverable_class.to_s}"
       end
 
-      union = +"("
-      union << [other_inbox, __getobj__].map { |scope| "(#{scope.to_sql})" }.join(" UNION ALL ")
-      union << ") #{deliverable_class.table_name}"
-
-      deliverable_class.from(union)
+      deliverable_class.from(union_all(other_inbox, __getobj__).as(deliverable_class.table_name))
     end
 
     private
